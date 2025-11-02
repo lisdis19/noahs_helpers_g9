@@ -1,3 +1,4 @@
+from core.action import Action, Move
 from core.message import Message
 from core.player import Player
 from core.snapshots import HelperSurroundingsSnapshot
@@ -12,7 +13,16 @@ class RandomPlayer(Player):
         pass
 
     def check_surroundings(self, snapshot: HelperSurroundingsSnapshot):
-        return 0
+        print(f"{self.id}: checking surroundings.. pos={snapshot.position}")
 
-    def get_action(self, one_byte_messages: list[Message]) -> int:
-        return 0
+        msg = snapshot.time_elapsed + self.id
+        if not self.is_message_valid(msg):
+            msg = msg & 0xff
+
+        return msg
+
+    def get_action(self, messages: list[Message]) -> Action:
+        for msg in messages:
+            print(f"{self.id}: got {msg.contents} from {msg.from_helper.id}")
+
+        return Move(*self.position)

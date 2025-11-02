@@ -2,10 +2,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import final
 
+from core.action import Action
 from core.animal import Animal
 from core.message import Message
 from core.views.player_view import PlayerView
 from core.snapshots import HelperSurroundingsSnapshot
+
+import core.constants as c
 
 
 class Player(ABC):
@@ -45,10 +48,14 @@ class Player(ABC):
             and int(self.position[1]) == self.ark_position[1]
         )
 
+    @final
+    def is_message_valid(self, msg: int) -> bool:
+        return 0 <= msg < (1 << c.ONE_BYTE)
+
     @abstractmethod
     def check_surroundings(self, snapshot: HelperSurroundingsSnapshot) -> int:
         raise Exception("not implemented")
 
     @abstractmethod
-    def get_action(self, one_byte_messages: list[Message]) -> int:
+    def get_action(self, messages: list[Message]) -> Action:
         raise Exception("not implemented")

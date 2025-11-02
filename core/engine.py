@@ -1,3 +1,4 @@
+from core.action import Move, Obtain, Release
 from core.ark import Ark
 from core.message import Message
 from core.player import Player
@@ -84,5 +85,13 @@ class Engine:
 
             for helper in self.helpers:
                 action = helper.get_action(messages_to[helper])
+
+                match action:
+                    case Release(animal=a):
+                        print(f"{helper.id}: relasing {a}")
+                    case Obtain(animal=a):
+                        print(f"{helper.id}: obtaining {a}")
+                    case Move(x=x, y=y):
+                        print(f"{helper.id}: moving to {(x, y)}")
 
             # 5. let free animals move with 0.5 probability
