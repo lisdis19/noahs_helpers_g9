@@ -26,8 +26,13 @@ class Cell:
         )
 
     def get_emptiest_neighbors(self) -> list[Cell]:
-        dirs = [self.up, self.down, self.left, self.right]
-        dirs = [dir for dir in dirs if dir is not None]
+        dirs = [
+            dir
+            for dir in [self.up, self.down, self.left, self.right]
+            if dir is not None
+        ]
+
+        print(f"cell {self.x, self.y} has {len(dirs)} non-empty cells")
 
         min_animals = min([len(dir.animals) for dir in dirs])
 
