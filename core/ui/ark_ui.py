@@ -41,8 +41,8 @@ class ArkUI:
 
         self.screen = pygame.display.set_mode((c.SCREEN_WIDTH, c.SCREEN_HEIGHT))
         self.bg_color = c.BG_COLOR
-        self.big_font = pygame.font.Font(None, 36)
-        self.small_font = pygame.font.Font(None, 28)
+        self.big_font = pygame.font.SysFont(None, 36)
+        self.small_font = pygame.font.SysFont(None, 28)
 
         self.debug_mode = False
 
@@ -56,8 +56,9 @@ class ArkUI:
         line: str,
         coord: tuple[int, int],
         align: Literal["left", "center", "right"] = "center",
+        color=(0, 0, 0),
     ):
-        text = font.render(line, True, (0, 0, 0))
+        text = font.render(line, True, color)
 
         # get rectangle to center the text
         match align:
@@ -121,7 +122,13 @@ class ArkUI:
         ark_x, ark_y = self.engine.ark.position
         ark_center = coords_to_px(ark_x, ark_y)
 
-        pygame.draw.circle(self.screen, c.ARK_COLOR, ark_center, c.ARK_RADIUS)
+        ark_img_orig = pygame.image.load("sprites/ark.png").convert_alpha()
+        ark_img = pygame.transform.scale(
+            ark_img_orig, (2.5 * c.ARK_RADIUS, 2.5 * c.ARK_RADIUS)
+        )
+        ark_rect = ark_img.get_rect(center=ark_center)
+        self.screen.blit(ark_img, ark_rect)
+        # pygame.draw.circle(self.screen, c.ARK_COLOR, ark_center, c.ARK_RADIUS)
 
         key = (ark_center, c.ARK_RADIUS)
         self.drawn_objects[key] = self.engine.ark
@@ -254,15 +261,37 @@ class ArkUI:
             f"{'DEBUG ON' if self.debug_mode else 'DEBUG OFF'}",  # NEW: Show debug status
         ]
 
-        last = 0
+        y = 0
         for i, line in enumerate(info_lines):
             y = info_pane_y + i * 30
             if line:  # Skip empty debug line when not in debug mode
-                text = self.big_font.render(line, True, (0, 0, 0))
-                self.screen.blit(text, (info_pane_x, y))
-            last = y
+                self.write_at(self.big_font, line, (info_pane_x, y), align="left")
 
-        # species = {sid: }
+        y += 40
+
+        self.write_at(self.big_font, "Animals", (info_pane_x, y), align="left")
+        for sid, (num_male, num_female) in self.engine.species_stats.items():
+            y += 30
+            self.write_at(
+                self.big_font,
+                f"{sid}:",
+                (info_pane_x + 20, y),
+                align="left",
+            )
+            self.write_at(
+                self.big_font,
+                f"{num_male}M",
+                (info_pane_x + 60, y),
+                align="left",
+                color=c.MALE_ANIMAL_COLOR
+            )
+            self.write_at(
+                self.big_font,
+                f"{num_female}F",
+                (info_pane_x + 110, y),
+                align="left",
+                color=c.FEMALE_ANIMAL_COLOR
+            )
 
     def draw_debug_helper_screens(self):
         grid = pygame.Rect(
