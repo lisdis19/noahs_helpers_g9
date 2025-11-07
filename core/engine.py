@@ -109,6 +109,7 @@ class Engine:
 
                     helper.flock.remove(a)
                     self.free_animals[a] = cell
+                    cell.animals.add(a)
 
                 case Obtain(animal=a):
                     helper_x, helper_y = tuple(map(int, helper.position))
@@ -162,7 +163,8 @@ class Engine:
 
                 cell.animals.remove(animal)
                 neighbor.animals.add(animal)
-                # this is ok as we're not changing the keys
+                # modifying self.free_animals while iterating
+                # is ok as we're not changing the keys
                 self.free_animals[animal] = neighbor
 
         self.time_elapsed += 1
