@@ -15,7 +15,6 @@ from core.views.cell_view import CellView
 def distance(x1: float, y1: float, x2: float, y2: float) -> float:
     return (abs(x1 - x2) ** 2 + abs(y1 - y2) ** 2) ** 0.5
 
-
 class Player9(Player):
     
     FLOCK_CAPACITY = 4
