@@ -1,22 +1,22 @@
 from __future__ import annotations
 
-from random import random, choice
 import math
+from random import choice, random
 from typing import Any
 
 from core.action import Action, Move, Obtain
 from core.message import Message
 from core.player import Player
 from core.snapshots import HelperSurroundingsSnapshot
-from core.views.player_view import Kind
 from core.views.cell_view import CellView
+from core.views.player_view import Kind
 
 
 def distance(x1: float, y1: float, x2: float, y2: float) -> float:
     return (abs(x1 - x2) ** 2 + abs(y1 - y2) ** 2) ** 0.5
 
+
 class Player9(Player):
-    
     FLOCK_CAPACITY = 4
 
     def __init__(
@@ -29,23 +29,22 @@ class Player9(Player):
         species_populations: dict[str, int],
     ):
         super().__init__(id, ark_x, ark_y, kind, num_helpers, species_populations)
-        
+
         self.is_raining = False
         self.hellos_received: list[int] = []
         self.num_helpers = num_helpers
-        
+
         # Initialize ark_inventory so the linter is happy.
         self.ark_inventory: dict[str, set[str]] = {}
 
         # --- Communication and Targeting ---
         self.noah_target_species: str | None = None
-        
+
         # Sort species from rarest to commonest
         self.rarity_order = sorted(
-            species_populations.keys(),
-            key=lambda s: species_populations.get(s, 0)
+            species_populations.keys(), key=lambda s: species_populations.get(s, 0)
         )
-        
+
         # Create a mapping for 1-byte messages
         self.int_to_species: dict[int, str] = {
             i + 1: species for i, species in enumerate(self.rarity_order)
@@ -60,12 +59,11 @@ class Player9(Player):
             self.sweep_angle = 2.0 * math.pi * idx / num_helpers
         else:
             self.sweep_angle = 0.0
-        
+
         if self.kind == Kind.Noah:
             print("I am Noah. I will coordinate.")
         else:
             print(f"I am Helper {self.id}. My sweep angle is {self.sweep_angle:.2f}")
-
 
     # ---------- Core Helper Functions ----------
 
@@ -83,24 +81,24 @@ class Player9(Player):
         then stays put. This is to prevent any freezes.
         """
         old_x, old_y = self.position
-        
+
         # 1. Try 10 random moves
-        for _ in range(10): 
+        for _ in range(10):
             dx, dy = random() - 0.5, random() - 0.5
             new_x, new_y = old_x + dx, old_y + dy
             if self.can_move_to(new_x, new_y):
                 return new_x, new_y
-        
+
         # 2. Fallback 1: Try to move to the center
         new_x, new_y = self.move_towards(500.0, 500.0)
         if self.can_move_to(new_x, new_y):
             return new_x, new_y
-        
+
         # 3. Fallback 2: Try to move to the Ark
         new_x, new_y = self.move_towards(*self.ark_position)
         if self.can_move_to(new_x, new_y):
             return new_x, new_y
-            
+
         # 4. Fallback 3: Stay put (absolute last resort)
         return old_x, old_y
 
@@ -110,25 +108,25 @@ class Player9(Player):
         """(Noah's logic) Finds the rarest species we don't have 2 of."""
         for species in self.rarity_order:
             if species not in self.ark_inventory:
-                return species # We have none
+                return species  # We have none
             if len(self.ark_inventory.get(species, set())) < 2:
-                return species # We only have one gender
-        return None # We have saved all species!
+                return species  # We only have one gender
+        return None  # We have saved all species!
 
     def _get_best_animal_on_cell(self, cellview: CellView) -> Any | None:
         """(Helper logic) Finds the best animal to Obtain on the current cell."""
         if not cellview.animals:
             return None
-        
+
         target_animal = None
         # Priority 1: Get the animal Noah wants
         if self.noah_target_species:
             for animal in cellview.animals:
-                species_name = str(animal).split(' ')[0]
+                species_name = str(animal).split(" ")[0]
                 if species_name == self.noah_target_species:
                     target_animal = animal
                     break
-        
+
         if target_animal:
             return target_animal
 
@@ -146,27 +144,27 @@ class Player9(Player):
 
             dist = distance(*self.position, cellview.x, cellview.y)
             has_target = False
-            
+
             if self.noah_target_species:
                 for animal in cellview.animals:
-                    species_name = str(animal).split(' ')[0]
+                    species_name = str(animal).split(" ")[0]
                     if species_name == self.noah_target_species:
                         target_cells.append((dist, (cellview.x, cellview.y)))
                         has_target = True
                         break
-            
+
             if not has_target:
                 any_cells.append((dist, (cellview.x, cellview.y)))
 
         # Priority 1: Go for the closest cell that has our target
         if target_cells:
-            target_cells.sort(key=lambda x: x[0]) # Sort by distance
-            return target_cells[0][1] # Return (x, y)
+            target_cells.sort(key=lambda x: x[0])  # Sort by distance
+            return target_cells[0][1]  # Return (x, y)
 
         # Priority 2: No target in sight. Go for the closest *any* animal.
         if any_cells:
-            any_cells.sort(key=lambda x: x[0]) # Sort by distance
-            return any_cells[0][1] # Return (x, y)
+            any_cells.sort(key=lambda x: x[0])  # Sort by distance
+            return any_cells[0][1]  # Return (x, y)
 
         return None
 
@@ -182,7 +180,7 @@ class Player9(Player):
         if (old_x < 5.0 and base_dx < 0.0) or (old_x > 995.0 and base_dx > 0.0):
             base_dx = -base_dx
             reflected = True
-            
+
         if (old_y < 5.0 and base_dy < 0.0) or (old_y > 995.0 and base_dy > 0.0):
             base_dy = -base_dy
             reflected = True
@@ -224,15 +222,15 @@ class Player9(Player):
                 msg = self.species_to_int.get(target_species, 0)
                 return msg
             else:
-                return 0 # 0 = "Get anything"
-        
+                return 0  # 0 = "Get anything"
+
         else:
             # --- HELPER'S LOGIC ---
             self.position = snapshot.position
             self.flock = snapshot.flock
             self.sight = snapshot.sight
             self.is_raining = snapshot.is_raining
-            
+
             # Simple "hello" protocol
             if len(self.hellos_received) == 0:
                 msg = 1 << (self.id % 8)
@@ -252,9 +250,9 @@ class Player9(Player):
         Called by the simulator for *both* Noah and Helpers.
         Noah does nothing. Helpers act.
         """
-        
+
         if self.kind == Kind.Noah:
-            return None # Noah doesn't move or act
+            return None  # Noah doesn't move or act
 
         # --- HELPER'S LOGIC ---
 
@@ -263,15 +261,15 @@ class Player9(Player):
             if msg.from_helper.kind == Kind.Noah:
                 self.noah_target_species = self.int_to_species.get(msg.contents)
                 break
-        
+
         # 2. Handle "Hello" messages
         for msg in messages:
             if msg.from_helper.kind == Kind.Helper:
-                 if 1 << (msg.from_helper.id % 8) == msg.contents:
-                     self.hellos_received.append(msg.contents)
+                if 1 << (msg.from_helper.id % 8) == msg.contents:
+                    self.hellos_received.append(msg.contents)
 
         # 3. Decide on an Action
-        
+
         # Priority 1: Safety / Flood Awareness / Full Inventory
         if self.is_raining:
             # Raining = flood is spreading → get to Ark ASAP
@@ -283,13 +281,13 @@ class Player9(Player):
             dist_to_ark = distance(*self.position, *self.ark_position)
             if dist_to_ark > 40:
                 return Move(*self.move_towards(*self.ark_position))
-            
+
         # *** Priority 2: THIS IS THE FIX (Reverted) ***
         # If we have *any* animal, return to score.
         # This avoids the sweep bug and scores points.
         if len(self.flock) > 0:
             return Move(*self.move_towards(*self.ark_position))
-        
+
         # Priority 3: Obtain animal if on a cell with one
         cellview = self._get_my_cell()
         if len(self.flock) < self.FLOCK_CAPACITY and len(cellview.animals) > 0:
