@@ -48,3 +48,14 @@ If helpers can’t see any animals at all:
 This ensures they keep exploring and don’t freeze in empty areas.
 
 ---
+
+Noah encodes gender preference into its 1-byte broadcast:
+Base species code remains in the low 7 bits.
+Top bit (0x80) set => prefer Female. No top bit => prefer Male.
+Noah sets the top bit when the ark already contains a Male for that species (so Noah requests a Female).
+Helpers decode Noah's message and set:
+self.noah_target_species (species letter)
+self.noah_prefer_gender ('F' or 'M')
+Helpers now use noah_prefer_gender:
+_get_best_animal_on_cell: when on a cell with Noah's target species, prefer an animal matching preferred gender; fallback to any animal of that species.
+_find_best_animal_to_chase: prefer cells that contain the preferred gender (those cells are prioritized).
