@@ -10,6 +10,7 @@ from core.player import Player
 from core.snapshots import HelperSurroundingsSnapshot
 from core.views.cell_view import CellView
 from core.views.player_view import Kind
+from core.animal import Gender
 
 
 def distance(x1: float, y1: float, x2: float, y2: float) -> float:
@@ -118,18 +119,33 @@ class Player9(Player):
         """(Helper logic) Finds the best animal to Obtain on the current cell."""
         if not cellview.animals:
             return None
-
-        target_animal = None
-        # Priority 1: Get the animal Noah wants
+        # Priority 1: Get the animal Noah wants (and prefer the complementary gender)
         if self.noah_target_species:
+            preferred = None
+            fallback = None
             for animal in cellview.animals:
                 species_name = str(animal).split(" ")[0]
-                if species_name == self.noah_target_species:
-                    target_animal = animal
+                if species_name != self.noah_target_species:
+                    continue
+                # exact species match
+                # determine animal's gender string
+                try:
+                    a_gender = "M" if animal.gender.name == "Male" else "F"
+                except Exception:
+                    a_gender = None
+
+                # prefer the gender Noah signaled
+                if getattr(self, "noah_prefer_gender", None) is not None and a_gender == self.noah_prefer_gender:
+                    preferred = animal
                     break
 
-        if target_animal:
-            return target_animal
+                # keep a fallback (any animal of the species)
+                fallback = animal
+
+            if preferred:
+                return preferred
+            if fallback:
+                return fallback
 
         # Priority 2: No target, or target not here. Just grab one.
         return choice(tuple(cellview.animals))
@@ -147,12 +163,32 @@ class Player9(Player):
             has_target = False
 
             if self.noah_target_species:
+                # prefer cells that contain the preferred gender of Noah's target
+                found_preferred = False
                 for animal in cellview.animals:
                     species_name = str(animal).split(" ")[0]
-                    if species_name == self.noah_target_species:
-                        target_cells.append((dist, (cellview.x, cellview.y)))
+                    if species_name != self.noah_target_species:
+                        continue
+                    # determine animal's gender string
+                    try:
+                        a_gender = "M" if animal.gender.name == "Male" else "F"
+                    except Exception:
+                        a_gender = None
+
+                    if getattr(self, "noah_prefer_gender", None) is not None and a_gender == self.noah_prefer_gender:
+                        # very high priority (use 0 so it sorts first)
+                        target_cells.append((0.0, (cellview.x, cellview.y)))
+                        found_preferred = True
                         has_target = True
                         break
+
+                if not found_preferred:
+                    for animal in cellview.animals:
+                        species_name = str(animal).split(" ")[0]
+                        if species_name == self.noah_target_species:
+                            target_cells.append((dist, (cellview.x, cellview.y)))
+                            has_target = True
+                            break
 
             if not has_target:
                 any_cells.append((dist, (cellview.x, cellview.y)))
@@ -218,9 +254,32 @@ class Player9(Player):
         """
         if self.kind == Kind.Noah:
             # --- NOAH'S LOGIC ---
+            # Update Noah's view of what's already in the Ark (if available).
+            # The engine includes an ArkView in the snapshot when the player
+            # is in the Ark; Noah is stationary on the Ark so this should be
+            # available and lets Noah pick species that are missing a gender.
+            if snapshot.ark_view is not None:
+                self.ark_inventory = {}
+                for animal in snapshot.ark_view.animals:
+                    # convert species id to letter to match rarity_order keys
+                    species = chr(animal.species_id + ord("a"))
+                    gender = "M" if animal.gender == Gender.Male else "F"
+                    if species not in self.ark_inventory:
+                        self.ark_inventory[species] = set()
+                    self.ark_inventory[species].add(gender)
+
             target_species = self._find_rarest_needed_species()
             if target_species:
-                msg = self.species_to_int.get(target_species, 0)
+                base = self.species_to_int.get(target_species, 0)
+                # Decide which gender Noah needs for this species.
+                need = self.ark_inventory.get(target_species, set())
+                # We'll encode a preference bit in the top bit (0x80):
+                # if only male present in ark, set bit to request a female.
+                if need == {"M"}:
+                    msg = base | 0x80
+                else:
+                    # default (no top bit) => prefer male (or no preference)
+                    msg = base
                 return msg
             else:
                 return 0  # 0 = "Get anything"
@@ -260,7 +319,15 @@ class Player9(Player):
         # 1. Listen for Noah's broadcast
         for msg in messages:
             if msg.from_helper.kind == Kind.Noah:
-                self.noah_target_species = self.int_to_species.get(msg.contents)
+                raw = msg.contents
+                prefer_female = bool(raw & 0x80)
+                species = self.int_to_species.get(raw & 0x7F)
+                self.noah_target_species = species
+                # 'F' or 'M' depending on Noah's preference bit (no bit => prefer M)
+                if species is not None:
+                    self.noah_prefer_gender = "F" if prefer_female else "M"
+                else:
+                    self.noah_prefer_gender = None
                 break
 
         # 2. Handle "Hello" messages
