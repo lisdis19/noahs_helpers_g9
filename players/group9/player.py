@@ -11,7 +11,6 @@ from core.animal import Gender
 from core.message import Message
 from core.player import Player
 from core.snapshots import HelperSurroundingsSnapshot
-from core.views.cell_view import CellView
 from core.views.player_view import Kind
 
 
