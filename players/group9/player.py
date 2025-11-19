@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from random import random
 import math
+from math import ceil, hypot
+from random import random
 from typing import Any
 
+import core.constants as c
 from core.action import Action, Move, Obtain, Release
+from core.animal import Gender
 from core.message import Message
 from core.player import Player
 from core.snapshots import HelperSurroundingsSnapshot
 from core.views.player_view import Kind
-from core.animal import Gender
-from math import hypot, ceil
-import core.constants as c
 
 
 def distance(x1: float, y1: float, x2: float, y2: float) -> float:
@@ -156,7 +156,7 @@ class Player9(Player):
     def _is_at_ark(self, snapshot: HelperSurroundingsSnapshot) -> bool:
         current_x, current_y = snapshot.position
         ark_x, ark_y = self.ark_position
-        return (int(current_x) == int(ark_x) and int(current_y) == int(ark_y))
+        return int(current_x) == int(ark_x) and int(current_y) == int(ark_y)
 
     def _get_species_rarity(self, species_id: Any) -> float:
         return self.rarity_map.get(str(species_id), float("inf"))
@@ -327,7 +327,7 @@ class Player9(Player):
             return Move(cx, cy)
 
         # --- FIX: Do not try to move to ark if already on ark cell ---
-        is_on_ark_cell = (int(old_x) == int(ark_x) and int(old_y) == int(ark_y))
+        is_on_ark_cell = int(old_x) == int(ark_x) and int(old_y) == int(ark_y)
         if not is_on_ark_cell:
             ax, ay = self.move_towards(ark_x, ark_y)
             if (ax, ay) != (old_x, old_y) and self.can_move_to(ax, ay):
@@ -500,7 +500,9 @@ class Player9(Player):
         flock_size = len(self.flock)
         pos = f"({self.position[0]:.1f}, {self.position[1]:.1f})"
         print(f"--- {my_id}: STATE ---")
-        print(f"{my_id}: Pos={pos} | Flock={flock_size}/{self.FLOCK_CAPACITY} | ForcedReturn={self.forced_return}")
+        print(
+            f"{my_id}: Pos={pos} | Flock={flock_size}/{self.FLOCK_CAPACITY} | ForcedReturn={self.forced_return}"
+        )
 
         # --- Message decoding ---
         occupied_sectors: set[int] = set()
@@ -516,7 +518,9 @@ class Player9(Player):
         if self.current_sector is not None and self.current_sector in occupied_sectors:
             occupied_sectors.discard(self.current_sector)
 
-        print(f"{my_id}: NoahTarget={self.noah_target_species} | OccupiedSectors={occupied_sectors}")
+        print(
+            f"{my_id}: NoahTarget={self.noah_target_species} | OccupiedSectors={occupied_sectors}"
+        )
 
         cellview = self._get_my_cell(snapshot)
         at_ark = self._is_at_ark(snapshot)
@@ -575,7 +579,9 @@ class Player9(Player):
 
             # If no target in sight, optionally wander away if there is enough time.
             MIN_TIME_TO_LEAVE_ARK = 12  # (10 for margin + 2 for buffer)
-            print(f"{my_id}: AT_ARK: No targets. Turns left: {available_turns}. Need > {MIN_TIME_TO_LEAVE_ARK} to wander.")
+            print(
+                f"{my_id}: AT_ARK: No targets. Turns left: {available_turns}. Need > {MIN_TIME_TO_LEAVE_ARK} to wander."
+            )
             if available_turns > MIN_TIME_TO_LEAVE_ARK:
                 sweep_move = self._get_sweep_move()
                 if sweep_move is not None:
@@ -604,7 +610,9 @@ class Player9(Player):
 
         # 2b) FLOCK FULL: maybe swap, then bank
         if self.is_flock_full():
-            print(f"{my_id}: NOT_AT_ARK: Flock is full. Checking for swap, then returning.")
+            print(
+                f"{my_id}: NOT_AT_ARK: Flock is full. Checking for swap, then returning."
+            )
             release_action = self._get_smart_release(cellview)
             if release_action:
                 print(f"{my_id}: NOT_AT_ARK: Swapping animal. RELEASING.")
@@ -619,7 +627,9 @@ class Player9(Player):
             if animals_on_cell and not cell_is_stuck:
                 best_to_obtain = self._get_best_animal_on_cell(cellview)
                 if best_to_obtain:
-                    print(f"{my_id}: NOT_AT_ARK: Carrying {flock_size}, free animal on cell. OBTAINING.")
+                    print(
+                        f"{my_id}: NOT_AT_ARK: Carrying {flock_size}, free animal on cell. OBTAINING."
+                    )
                     return Obtain(best_to_obtain)
 
             # Try to chase a *very* nearby target if:
@@ -634,21 +644,29 @@ class Player9(Player):
             if best_animal_pos:
                 tx, ty = best_animal_pos
                 dist = distance(self.position[0], self.position[1], tx + 0.5, ty + 0.5)
-                print(f"{my_id}: NOT_AT_ARK: Carrying {flock_size}, nearby target at {best_animal_pos} (dist={dist:.1f}, avail={available_turns}).")
+                print(
+                    f"{my_id}: NOT_AT_ARK: Carrying {flock_size}, nearby target at {best_animal_pos} (dist={dist:.1f}, avail={available_turns})."
+                )
 
                 if dist <= CLUSTER_RADIUS and available_turns > MIN_TURNS_FOR_EXTRA:
-                    print(f"{my_id}: NOT_AT_ARK: Extra cluster is close and time is safe. CHASING before banking.")
+                    print(
+                        f"{my_id}: NOT_AT_ARK: Extra cluster is close and time is safe. CHASING before banking."
+                    )
                     return self._move_to_cell(tx, ty)
 
             # Otherwise, just bank the score.
-            print(f"{my_id}: NOT_AT_ARK: Carrying {flock_size}. No safe close cluster. RETURNING TO ARK.")
+            print(
+                f"{my_id}: NOT_AT_ARK: Carrying {flock_size}. No safe close cluster. RETURNING TO ARK."
+            )
             return self._move_to_ark()
 
         # 2d) EMPTY FLOCK: try to obtain on our cell, unless it's a "stuck" cell.
         if animals_on_cell and not cell_is_stuck:
             best_to_obtain = self._get_best_animal_on_cell(cellview)
             if best_to_obtain:
-                print(f"{my_id}: NOT_AT_ARK: EMPTY + found {best_to_obtain.species_id} on my cell. OBTAINING.")
+                print(
+                    f"{my_id}: NOT_AT_ARK: EMPTY + found {best_to_obtain.species_id} on my cell. OBTAINING."
+                )
                 return Obtain(best_to_obtain)
 
         # 2e) If animals here but we consider this cell stuck → sweep away
