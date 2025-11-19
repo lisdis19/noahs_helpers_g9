@@ -33,6 +33,7 @@ class Player9(Player):
         self.is_raining = False
         self.hellos_received: list[int] = []
         self.num_helpers = num_helpers
+        self.days_since_rain = 0
 
         # Initialize ark_inventory so the linter is happy.
         self.ark_inventory: dict[str, set[str]] = {}
@@ -272,8 +273,12 @@ class Player9(Player):
 
         # Priority 1: Safety / Flood Awareness / Full Inventory
         if self.is_raining:
-            # Raining = flood is spreading → get to Ark ASAP
-            return Move(*self.move_towards(*self.ark_position))
+            self.days_since_rain += 1
+            # check how far from ark
+            dist_to_ark = distance(*self.position, *self.ark_position)
+            # continue looking for things nearby until the distance is around the same as turns left
+            if dist_to_ark >= (900 - self.days_since_rain):
+                return Move(*self.move_towards(*self.ark_position))
 
         # If the game exposes time until flood or similar:
         if hasattr(self, "time_remaining"):
