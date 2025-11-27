@@ -13,7 +13,7 @@ def distance(x1: float, y1: float, x2: float, y2: float) -> float:
     return (abs(x1 - x2) ** 2 + abs(y1 - y2) ** 2) ** 0.5
 
 
-class Player2(Player):
+class SearchAndRescue(Player):
     def __init__(
         self,
         id: int,
@@ -24,14 +24,12 @@ class Player2(Player):
         species_populations: dict[str, int],
     ):
         super().__init__(id, ark_x, ark_y, kind, num_helpers, species_populations)
-        # print(f"I am {self}")
+        print(f"I am {self}")
 
         self.is_raining = False
         self.hellos_received = []
         self.mode = "waiting"
-        # spread out initial direction outward from ark
-        self.direction = (ark_x + randint(-300, 300), ark_y + randint(-300, 300))
-
+        self.direction = (0, 0)
         self.internal_ark = set()
         self.complete_species = set()
 
@@ -39,65 +37,12 @@ class Player2(Player):
         self.rain = False
         self.timer = 1008
 
-        self.recent_positions = []  # Track last 50 positions
-        self.max_history = 50
-
-        # Grid-based exploration
-        # Scale down grid map into 100x100 cells (10x10 grid)
-        self.grid_size = 100
-        self.visited_cells = set()
-        self.current_target_cell = None
-
     def _get_my_cell(self) -> CellView:
         xcell, ycell = tuple(map(int, self.position))
         if not self.sight.cell_is_in_sight(xcell, ycell):
             raise Exception(f"{self} failed to find own cell")
 
         return self.sight.get_cellview_at(xcell, ycell)
-
-    def _get_next_grid_target(self) -> tuple[float, float]:
-        """Pick the next unvisited grid cell to explore"""
-        # Try to find an unvisited cell
-        # NOTE: can tune later this was arbitrarily picked for now
-        attempts = 0
-        max_attempts = 100
-
-        while attempts < max_attempts:
-            grid_x = randint(0, 9)
-            grid_y = randint(0, 9)
-
-            # Avoid visited cells + same cell we are already moving toward
-            if (grid_x, grid_y) in self.visited_cells or (
-                grid_x,
-                grid_y,
-            ) == self.current_target_cell:
-                attempts += 1
-                continue
-
-            # Valid new target
-            self.visited_cells.add((grid_x, grid_y))
-            self.current_target_cell = (grid_x, grid_y)
-            return self._get_grid_center(grid_x, grid_y)
-
-        # If most cells are visited then it's fine and we'll reset to allow revists
-        self.visited_cells.clear()
-        grid_x = randint(0, 9)
-        grid_y = randint(0, 9)
-        self.visited_cells.add((grid_x, grid_y))
-        self.current_target_cell = (grid_x, grid_y)
-        return self._get_grid_center(grid_x, grid_y)
-
-    def _get_grid_cell(self, x: float, y: float) -> tuple[int, int]:
-        """Convert a position to the scaled down 10x10 grid cell coordinates"""
-        grid_x = max(0, min(9, int(x // self.grid_size)))
-        grid_y = max(0, min(9, int(y // self.grid_size)))
-        return (grid_x, grid_y)
-
-    def _get_grid_center(self, grid_x: int, grid_y: int) -> tuple[float, float]:
-        """Get the center point of the scaled down 10x10 grid cell"""
-        center_x = grid_x * self.grid_size + self.grid_size // 2
-        center_y = grid_y * self.grid_size + self.grid_size // 2
-        return (center_x, center_y)
 
     def animal_to_tuple(self, animal):
         s_id = animal.species_id
@@ -137,7 +82,7 @@ class Player2(Player):
         count = 0
         while True:
             count += 1
-            dx, dy = randint(0, 999), randint(0, 999)
+            dx, dy = randint(0, 1000), randint(0, 1000)
             # print(dx, dy, count)
             # input()
             if distance(dx, dy, self.ark_position[0], self.ark_position[1]) < 1000:
@@ -154,24 +99,6 @@ class Player2(Player):
 
         self.sight = snapshot.sight
         self.is_raining = snapshot.is_raining
-
-        # Mark current grid cell(the scaled down 10x10 one that hosts 10 cells) as visited when exploring
-        if self.is_flock_empty():
-            current_grid = self._get_grid_cell(*self.position)
-            self.visited_cells.add(current_grid)
-
-        # Track when we're exploring (not when returning to ark with animals)
-        if self.is_flock_empty() or len(self.recent_positions) == 0:
-            self.recent_positions.append(self.position)
-            # Keep only the most recent positions
-            if len(self.recent_positions) > self.max_history:
-                self.recent_positions.pop(0)
-
-        # Clear some history when at ark to allow fresh exploration cycles(last 20 for now)
-        if snapshot.ark_view is not None and self.is_flock_empty():
-            # NOTE: tune later
-            if len(self.recent_positions) > 20:
-                self.recent_positions = self.recent_positions[-20:]
 
         """Update internal arc information"""
         if snapshot.ark_view is not None:
@@ -237,8 +164,6 @@ class Player2(Player):
 
         # If I have obtained an animal, go to ark
         if not self.is_flock_empty():
-            # Now heading to ark
-            self.direction = self.ark_position
             return Move(*self.move_towards(*self.ark_position))
 
         """If a helper checked and animal and noted it is already in the arc
@@ -276,31 +201,18 @@ class Player2(Player):
             # animals in other helpers' flocks
             return Move(*self.move_towards(*closest_animal))
 
-        # Systematic grid exploration
+        # Move in a random direction
         if self.mode == "waiting":
-            # Pick a new grid cell to explore
-            direction = self._get_next_grid_target()
+            direction = self._get_random_location()
             self.mode = "moving"
             self.direction = direction
             return Move(*self.move_towards(*self.direction))
-        else:
-            # Check if we've reached our target grid cell
-            if self.current_target_cell:
-                current_grid = self._get_grid_cell(*self.position)
-                if current_grid == self.current_target_cell:
-                    # Reached target, pick new cell
-                    direction = self._get_next_grid_target()
-                    self.mode = "moving"
-                    self.direction = direction
-                    return Move(*self.move_towards(*self.direction))
 
-            # Check if close to direction target
-            if distance(*self.position, *self.direction) < 10:
-                # Pick new grid cell
-                direction = self._get_next_grid_target()
+        else:
+            if self.position == self.direction or self.position == self.ark_position:
+                direction = self._get_random_location()
                 self.mode = "moving"
                 self.direction = direction
                 return Move(*self.move_towards(*self.direction))
             else:
-                # Keep moving toward current target
                 return Move(*self.move_towards(*self.direction))
