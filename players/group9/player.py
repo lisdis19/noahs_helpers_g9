@@ -544,7 +544,9 @@ class Player9(Player):
             pass
         return False
 
-    def _do_move(self, x: float, y: float, reason: str = "manual", allow_noop: bool = False) -> Move | None:
+    def _do_move(
+        self, x: float, y: float, reason: str = "manual", allow_noop: bool = False
+    ) -> Move | None:
         """
         Centralized move wrapper: logs the move reason, detects no-op (integer-cell) moves
         and falls back to a sweep/random move if the integer cell wouldn't change.
@@ -583,12 +585,16 @@ class Player9(Player):
             pass
 
         try:
-            print(f"Helper {getattr(self,'id',None)} MOVE reason={reason} from={self.position} to=({x:.2f},{y:.2f})")
+            print(
+                f"Helper {getattr(self, 'id', None)} MOVE reason={reason} from={self.position} to=({x:.2f},{y:.2f})"
+            )
         except Exception:
             pass
         return Move(x, y)
 
-    def _find_animals_in_corridor(self, lookahead: float = 2.0, corridor: float = 1.5) -> tuple[int, int] | None:
+    def _find_animals_in_corridor(
+        self, lookahead: float = 2.0, corridor: float = 1.5
+    ) -> tuple[int, int] | None:
         """Find a nearby cell within a forward corridor along sweep direction.
         Returns cell coords (x,y) or None.
         """
@@ -705,9 +711,10 @@ class Player9(Player):
             self._last_snapshot = snapshot
 
             # Record when rain first started so helpers can reason about urgency.
-            if getattr(snapshot, "is_raining", False) and getattr(
-                self, "rain_start_turn", None
-            ) is None:
+            if (
+                getattr(snapshot, "is_raining", False)
+                and getattr(self, "rain_start_turn", None) is None
+            ):
                 try:
                     self.rain_start_turn = snapshot.time_elapsed
                 except Exception:
@@ -798,9 +805,10 @@ class Player9(Player):
             # If timing info is not yet available, assume 0 moves since rain
             # rather than forcing an immediate return (less conservative).
             try:
-                if getattr(self, "rain_start_turn", None) is None or getattr(
-                    self, "_last_snapshot", None
-                ) is None:
+                if (
+                    getattr(self, "rain_start_turn", None) is None
+                    or getattr(self, "_last_snapshot", None) is None
+                ):
                     moves_since_first_rain = 0
                 else:
                     moves_since_first_rain = int(
@@ -813,7 +821,11 @@ class Player9(Player):
             if 950 - dist_to_ark - moves_since_first_rain <= 0:
                 # Head back to ark; we'll pick up animals along the way via
                 # the normal Obtain logic when passing cells.
-                act = self._do_move(*self.move_towards(*self.ark_position), reason="return_due_to_rain", allow_noop=True)
+                act = self._do_move(
+                    *self.move_towards(*self.ark_position),
+                    reason="return_due_to_rain",
+                    allow_noop=True,
+                )
                 if act is not None:
                     return act
 
@@ -822,7 +834,11 @@ class Player9(Player):
             # If far away from the ark, start returning before the flood kills the helper
             dist_to_ark = distance(*self.position, *self.ark_position)
             if dist_to_ark > 40:
-                act = self._do_move(*self.move_towards(*self.ark_position), reason="return_due_to_time_remaining", allow_noop=True)
+                act = self._do_move(
+                    *self.move_towards(*self.ark_position),
+                    reason="return_due_to_time_remaining",
+                    allow_noop=True,
+                )
                 if act is not None:
                     return act
 
@@ -831,12 +847,22 @@ class Player9(Player):
         # If we're already in the ark cell and carrying animals, force an
         # explicit Move to the ark (allow_noop=True) so the engine processes
         # the Move and offloads the helper's flock into the Ark.
-        if (int(self.position[0]), int(self.position[1])) == tuple(self.ark_position) and flock_size > 0:
-            act = self._do_move(*self.move_towards(*self.ark_position), reason="offload_at_ark", allow_noop=True)
+        if (int(self.position[0]), int(self.position[1])) == tuple(
+            self.ark_position
+        ) and flock_size > 0:
+            act = self._do_move(
+                *self.move_towards(*self.ark_position),
+                reason="offload_at_ark",
+                allow_noop=True,
+            )
             if act is not None:
                 return act
         if flock_size >= 3:
-            act = self._do_move(*self.move_towards(*self.ark_position), reason="return_flock_full", allow_noop=True)
+            act = self._do_move(
+                *self.move_towards(*self.ark_position),
+                reason="return_flock_full",
+                allow_noop=True,
+            )
             if act is not None:
                 return act
 
@@ -850,10 +876,12 @@ class Player9(Player):
                 if nearby:
                     nx, ny = nearby
                     Player9.shared_claims[(nx, ny)] = (self.id, Player9.CLAIM_TTL)
-                    act = self._do_move(*self.move_towards(nx + 0.5, ny + 0.5), reason="move_to_nearby_collect")
+                    act = self._do_move(
+                        *self.move_towards(nx + 0.5, ny + 0.5),
+                        reason="move_to_nearby_collect",
+                    )
                     if act is not None:
                         return act
-            
 
         # # unstuck detection: if we've been on same cell with same flock repeatedly, try random move
         # cx, cy = int(self.position[0]), int(self.position[1])
@@ -893,7 +921,12 @@ class Player9(Player):
         # If at ark and still carrying animals, explicitly request a no-op Move
         # to the Ark (allow_noop=True) to trigger engine offload of the flock.
         if at_ark and len(self.flock) > 0:
-            act = self._do_move(self.ark_position[0], self.ark_position[1], reason="offload_at_ark", allow_noop=True)
+            act = self._do_move(
+                self.ark_position[0],
+                self.ark_position[1],
+                reason="offload_at_ark",
+                allow_noop=True,
+            )
             if act is not None:
                 return act
         if at_ark:
@@ -925,7 +958,10 @@ class Player9(Player):
             if best is not None:
                 # move to nearest adjacent animal cell immediately
                 tx, ty = best
-                act = self._do_move(*self.move_towards(tx + 0.5, ty + 0.5), reason="move_to_adjacent_ark_cell")
+                act = self._do_move(
+                    *self.move_towards(tx + 0.5, ty + 0.5),
+                    reason="move_to_adjacent_ark_cell",
+                )
                 if act is not None:
                     return act
 
@@ -972,7 +1008,9 @@ class Player9(Player):
             if comp:
                 tx, ty = comp
                 # if on same cell, obtain will be handled via cell logic above
-                act = self._do_move(*self.move_towards(tx + 0.5, ty + 0.5), reason="move_to_complement")
+                act = self._do_move(
+                    *self.move_towards(tx + 0.5, ty + 0.5), reason="move_to_complement"
+                )
                 if act is not None:
                     return act
 
@@ -985,7 +1023,10 @@ class Player9(Player):
                 if nearby:
                     nx, ny = nearby
                     Player9.shared_claims[(nx, ny)] = (self.id, Player9.CLAIM_TTL)
-                    act = self._do_move(*self.move_towards(nx + 0.5, ny + 0.5), reason="move_to_nearby_collect")
+                    act = self._do_move(
+                        *self.move_towards(nx + 0.5, ny + 0.5),
+                        reason="move_to_nearby_collect",
+                    )
                     if act is not None:
                         return act
 
@@ -1007,7 +1048,10 @@ class Player9(Player):
                     best = (cv.x, cv.y)
             if best:
                 Player9.shared_claims[(best[0], best[1])] = (self.id, Player9.CLAIM_TTL)
-                act = self._do_move(*self.move_towards(best[0] + 0.5, best[1] + 0.5), reason="move_to_cluster_target")
+                act = self._do_move(
+                    *self.move_towards(best[0] + 0.5, best[1] + 0.5),
+                    reason="move_to_cluster_target",
+                )
                 if act is not None:
                     return act
 
@@ -1034,7 +1078,10 @@ class Player9(Player):
                     best = (cv.x, cv.y)
             if best:
                 Player9.shared_claims[(best[0], best[1])] = (self.id, Player9.CLAIM_TTL)
-                act = self._do_move(*self.move_towards(best[0] + 0.5, best[1] + 0.5), reason="move_to_ark_runner_target")
+                act = self._do_move(
+                    *self.move_towards(best[0] + 0.5, best[1] + 0.5),
+                    reason="move_to_ark_runner_target",
+                )
                 if act is not None:
                     return act
 
@@ -1046,7 +1093,9 @@ class Player9(Player):
             tx, ty = corridor_target
             # claim this cell for a short time so others avoid it
             Player9.shared_claims[(tx, ty)] = (self.id, Player9.CLAIM_TTL)
-            act = self._do_move(*self.move_towards(tx + 0.5, ty + 0.5), reason="move_to_corridor_target")
+            act = self._do_move(
+                *self.move_towards(tx + 0.5, ty + 0.5), reason="move_to_corridor_target"
+            )
             if act is not None:
                 return act
 
@@ -1077,7 +1126,9 @@ class Player9(Player):
 
             # claim the target and move towards it
             Player9.shared_claims[(bx, by)] = (self.id, Player9.CLAIM_TTL)
-            act = self._do_move(*self.move_towards(bx + 0.5, by + 0.5), reason="move_to_chase_target")
+            act = self._do_move(
+                *self.move_towards(bx + 0.5, by + 0.5), reason="move_to_chase_target"
+            )
             if act is not None:
                 return act
 
@@ -1086,7 +1137,9 @@ class Player9(Player):
         # Final fallback: perform the sweep move unconditionally (this is reached
         # only if all earlier _do_move calls returned None indicating a pass).
         try:
-            print(f"Helper {getattr(self,'id',None)} MOVE reason=sweep from={self.position} to=({new_x:.2f},{new_y:.2f})")
+            print(
+                f"Helper {getattr(self, 'id', None)} MOVE reason=sweep from={self.position} to=({new_x:.2f},{new_y:.2f})"
+            )
         except Exception:
             pass
         return Move(new_x, new_y)
