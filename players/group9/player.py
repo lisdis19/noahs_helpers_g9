@@ -554,7 +554,7 @@ class Player9(Player):
         """
         try:
             # record last move intent for debugging
-            #prev = tuple(self.position)
+            # prev = tuple(self.position)
             self.last_move = (x, y)
             self.last_move_reason = reason
         except Exception:
