@@ -567,6 +567,15 @@ class Player9(Player):
             # store last snapshot for roundtrip safety checks in get_action
             self._last_snapshot = snapshot
 
+            # Record when rain first started so helpers can reason about urgency.
+            if getattr(snapshot, "is_raining", False) and getattr(
+                self, "rain_start_turn", None
+            ) is None:
+                try:
+                    self.rain_start_turn = snapshot.time_elapsed
+                except Exception:
+                    pass
+
             # reset local_collects when at ark
             if int(self.position[0]) == int(self.ark_position[0]) and int(
                 self.position[1]
@@ -645,8 +654,29 @@ class Player9(Player):
 
         # Priority 1: Safety / Flood Awareness / Full Inventory
         if self.is_raining:
-            # Raining = flood is spreading → get to Ark ASAP
-            return Move(*self.move_towards(*self.ark_position))
+            # Use the simple user-specified rule:
+            # if 950 - distance_from_ark - moves_since_first_rain <= 0 => return
+            # to Ark. We compute moves_since_first_rain from the first observed
+            # rain turn (rain_start_turn) and the last snapshot's time_elapsed.
+            # If timing info is not yet available, assume 0 moves since rain
+            # rather than forcing an immediate return (less conservative).
+            try:
+                if getattr(self, "rain_start_turn", None) is None or getattr(
+                    self, "_last_snapshot", None
+                ) is None:
+                    moves_since_first_rain = 0
+                else:
+                    moves_since_first_rain = int(
+                        self._last_snapshot.time_elapsed - self.rain_start_turn
+                    )
+            except Exception:
+                moves_since_first_rain = 0
+
+            dist_to_ark = distance(*self.position, *self.ark_position)
+            if 950 - dist_to_ark - moves_since_first_rain <= 0:
+                # Head back to ark; we'll pick up animals along the way via
+                # the normal Obtain logic when passing cells.
+                return Move(*self.move_towards(*self.ark_position))
 
         # If the game exposes time until flood or similar:
         if hasattr(self, "time_remaining"):
@@ -655,9 +685,9 @@ class Player9(Player):
             if dist_to_ark > 40:
                 return Move(*self.move_towards(*self.ark_position))
 
-        # Priority 2: If raining or flock full, return to Ark; otherwise allow local collection
+        # Priority 2: If flock full, return to Ark; otherwise allow local collection
         flock_size = len(self.flock)
-        if self.is_raining or flock_size >= self.FLOCK_CAPACITY:
+        if flock_size >= self.FLOCK_CAPACITY:
             return Move(*self.move_towards(*self.ark_position))
 
         # If carrying animals, allow multiple local extra collects before returning.
