@@ -596,8 +596,7 @@ class Player9(Player):
         self, lookahead: float = 2.0, corridor: float = 1.5
     ) -> tuple[int, int] | None:
         """Find a nearby cell within a forward corridor along sweep direction.
-        Returns cell coords (x,y) or None.
-        """
+        Returns cell coords (x,y) or None."""
         px, py = self.position
         dx = math.cos(self.sweep_angle)
         dy = math.sin(self.sweep_angle)
