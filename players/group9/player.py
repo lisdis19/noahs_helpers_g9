@@ -798,36 +798,8 @@ class Player9(Player):
 
         # Priority 1: Safety / Flood Awareness / Full Inventory
         if self.is_raining:
-            # Use the simple user-specified rule:
-            # if 950 - distance_from_ark - moves_since_first_rain <= 0 => return
-            # to Ark. We compute moves_since_first_rain from the first observed
-            # rain turn (rain_start_turn) and the last snapshot's time_elapsed.
-            # If timing info is not yet available, assume 0 moves since rain
-            # rather than forcing an immediate return (less conservative).
-            try:
-                if (
-                    getattr(self, "rain_start_turn", None) is None
-                    or getattr(self, "_last_snapshot", None) is None
-                ):
-                    moves_since_first_rain = 0
-                else:
-                    moves_since_first_rain = int(
-                        self._last_snapshot.time_elapsed - self.rain_start_turn
-                    )
-            except Exception:
-                moves_since_first_rain = 0
-
-            dist_to_ark = distance(*self.position, *self.ark_position)
-            if 950 - dist_to_ark - moves_since_first_rain <= 0:
-                # Head back to ark; we'll pick up animals along the way via
-                # the normal Obtain logic when passing cells.
-                act = self._do_move(
-                    *self.move_towards(*self.ark_position),
-                    reason="return_due_to_rain",
-                    allow_noop=True,
-                )
-                if act is not None:
-                    return act
+            # Raining = flood is spreading → get to Ark ASAP
+            return Move(*self.move_towards(*self.ark_position))
 
         # If the game exposes time until flood or similar:
         if hasattr(self, "time_remaining"):
