@@ -102,9 +102,7 @@ class Player9(Player):
         self.max_local_collects = 2
         self.local_collects = 0
         # zigzag state for sweep movement
-        self.zigzag_phase = False
-        self.zigzag_threshold = 50.0
-        self.zigzag_amplitude = 0.8
+        # (removed zig-zag/jitter variables for smooth movement)
 
     # ---------- Core Helper Functions ----------
 
@@ -494,22 +492,7 @@ class Player9(Player):
             target_x = px + dx
             target_y = py + dy
 
-        # Zig-zag: if far from ark, add a lateral offset alternating each call
-        dist_ark = distance(px, py, self.ark_position[0], self.ark_position[1])
-        if dist_ark >= getattr(self, "zigzag_threshold", 80.0):
-            # perpendicular vector
-            pdx, pdy = -dy, dx
-            # normalize
-            plen = math.hypot(pdx, pdy)
-            if plen > 0:
-                pdx /= plen
-                pdy /= plen
-                phase = 1.0 if self.zigzag_phase else -1.0
-                amp = getattr(self, "zigzag_amplitude", 0.8)
-                target_x += pdx * amp * phase
-                target_y += pdy * amp * phase
-                # flip phase for next call
-                self.zigzag_phase = not self.zigzag_phase
+        # No lateral zig-zag: sweep moves strictly in the chosen direction
 
         if self.can_move_to(target_x, target_y):
             return target_x, target_y
@@ -1088,7 +1071,7 @@ class Player9(Player):
         corridor_target = self._find_animals_in_corridor(
             lookahead=self.corridor_lookahead, corridor=self.corridor_width
         )
-        if corridor_target and not self.is_raining:
+        if corridor_target:
             tx, ty = corridor_target
             # claim this cell for a short time so others avoid it
             Player9.shared_claims[(tx, ty)] = (self.id, Player9.CLAIM_TTL)
