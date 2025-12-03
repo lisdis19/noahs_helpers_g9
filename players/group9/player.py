@@ -39,7 +39,6 @@ class Player9(Player):
         self.is_raining = False
         self.hellos_received: list[int] = []
         self.num_helpers = num_helpers
-        self.days_since_rain = 0
 
         # Initialize ark_inventory so the linter is happy.
         self.ark_inventory: dict[str, set[str]] = {}
@@ -779,10 +778,61 @@ class Player9(Player):
 
         # 3. Decide on an Action
 
+        # If we've recently Obtained an animal, prefer to stay on this cell
+        # and try to Obtain additional valid animals for a small number of turns
+        # This prevents small move/seek oscillations (jitters) immediately
+        # after picking up an animal.
+        if getattr(self, "stay_turns", 0) > 0:
+            try:
+                cellview = self._get_my_cell()
+                if getattr(cellview, "animals", None):
+                    animal = self._get_best_animal_on_cell(cellview)
+                    if animal:
+                        # consume one stay turn and attempt another Obtain
+                        try:
+                            self.stay_turns = max(0, self.stay_turns - 1)
+                        except Exception:
+                            self.stay_turns = 0
+                        return Obtain(animal)
+            except Exception:
+                # if anything goes wrong, stop forcing stay behavior
+                try:
+                    self.stay_turns = 0
+                except Exception:
+                    pass
+
         # Priority 1: Safety / Flood Awareness / Full Inventory
         if self.is_raining:
-            # Raining = flood is spreading → get to Ark ASAP
-            return Move(*self.move_towards(*self.ark_position))
+            # Use the simple user-specified rule:
+            # if 950 - distance_from_ark - moves_since_first_rain <= 0 => return
+            # to Ark. We compute moves_since_first_rain from the first observed
+            # rain turn (rain_start_turn) and the last snapshot's time_elapsed.
+            # If timing info is not yet available, assume 0 moves since rain
+            # rather than forcing an immediate return (less conservative).
+            try:
+                if (
+                    getattr(self, "rain_start_turn", None) is None
+                    or getattr(self, "_last_snapshot", None) is None
+                ):
+                    moves_since_first_rain = 0
+                else:
+                    moves_since_first_rain = int(
+                        self._last_snapshot.time_elapsed - self.rain_start_turn
+                    )
+            except Exception:
+                moves_since_first_rain = 0
+
+            dist_to_ark = distance(*self.position, *self.ark_position)
+            if 950 - dist_to_ark - moves_since_first_rain <= 0:
+                # Head back to ark; we'll pick up animals along the way via
+                # the normal Obtain logic when passing cells.
+                act = self._do_move(
+                    *self.move_towards(*self.ark_position),
+                    reason="return_due_to_rain",
+                    allow_noop=True,
+                )
+                if act is not None:
+                    return act
 
         # If the game exposes time until flood or similar:
         if hasattr(self, "time_remaining"):
@@ -926,7 +976,9 @@ class Player9(Player):
         if len(self.flock) == 0 and len(cellview.animals) > 0:
             animal_to_get = self._get_best_animal_on_cell(cellview)
             if animal_to_get:
-                self.stay_turns = 0
+                # After the first Obtain, allow a couple of turns to pick
+                # additional animals on the same cell without moving.
+                self.stay_turns = 2
                 return Obtain(animal_to_get)
         # Conditional multi-pick: if we carry less than capacity, allow additional picks on this cell if
         # (a) another valid animal is present on this cell, or
@@ -953,6 +1005,11 @@ class Player9(Player):
             ):
                 # mark we've done an extra local collect
                 self.local_collects += 1
+                # Allow one extra immediate stay turn to avoid move jitter
+                try:
+                    self.stay_turns = max(self.stay_turns, 1)
+                except Exception:
+                    self.stay_turns = 1
                 return Obtain(another)
 
         # Priority 4: Chase the "best" animal in sight
